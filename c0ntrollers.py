@@ -1,20 +1,22 @@
 import uinput
 import time
-import socketserver
 import select
 import threading
 import socket
 import time
+import logging
+
+l = None
 
 class C0ntroller(uinput.Device):
-    BTN_0_MASK = 0x10
-    BTN_1_MASK = 0x20
-    BTN_22MASK = 0x40
-    BTN_3_MASK = 0x80
     JOY_UP_MASK = 0x01
     JOY_RIGHT_MASK = 0x02
     JOY_DOWN_MASK = 0x04
     JOY_LEFT_MASK = 0x08
+    BTN_X_MASK = 0x10
+    BTN_A_MASK = 0x20
+    BTN_B_MASK = 0x40
+    BTN_Y_MASK = 0x80
 
     KEEP_ALIVE_TIMEOUT = 10
 
@@ -69,26 +71,26 @@ class C0ntroller(uinput.Device):
                 else:
                     self.emit(uinput.ABS_X, 128)
 
-            if event_diff & self.BTN_0_MASK != 0:
-                if event & self.BTN_0_MASK != 0:
+            if event_diff & self.BTN_X_MASK != 0:
+                if event & self.BTN_X_MASK != 0:
                     self.emit(uinput.BTN_0, 1)
                 else:
                     self.emit(uinput.BTN_0, 0)
 
-            if event_diff & self.BTN_1_MASK != 0:
-                if event & self.BTN_1_MASK != 0:
+            if event_diff & self.BTN_A_MASK != 0:
+                if event & self.BTN_A_MASK != 0:
                     self.emit(uinput.BTN_1, 1)
                 else:
                     self.emit(uinput.BTN_1, 0)
 
-            if event_diff & self.BTN_2_MASK != 0:
-                if event & self.BTN_2_MASK != 0:
+            if event_diff & self.BTN_B_MASK != 0:
+                if event & self.BTN_B_MASK != 0:
                     self.emit(uinput.BTN_2, 1)
                 else:
                     self.emit(uinput.BTN_2, 0)
 
-            if event_diff & self.BTN_3_MASK != 0:
-                if event & self.BTN_3_MASK != 0:
+            if event_diff & self.BTN_Y_MASK != 0:
+                if event & self.BTN_Y_MASK != 0:
                     self.emit(uinput.BTN_3, 1)
                 else:
                     self.emit(uinput.BTN_3, 0)
@@ -99,8 +101,13 @@ class S3rver(object):
     HOST = "0.0.0.0"
     PORT = 1337
 
-    CMD_KEEP_ALIVE = 0x7F
-    CMD_FIRE = 0xFF
+    MSG_SIZE = 6
+
+    CMD_KEEP_ALIVE = 0x10
+    CMD_BUTTONS_CHANGED = 0x11
+
+    CMD_SET_LED_0 = 0x20
+    CMD_SET_LED_1 = 0x21
 
     def __init__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -112,19 +119,38 @@ class S3rver(object):
 
     def serve(self):
         while True:
-            data, client_addr = self.sock.recvfrom(2)
+            data, client_addr = self.sock.recvfrom(self.MSG_SIZE)
+
+            l.info("Received data from {0}:".format(client_addr[0]) + str(data)[1:])
+
+            if len(data) != self.MSG_SIZE:
+                l.warn("Not a valid command: wrong packet length!")
+                continue
+
+            if data[0] != data[self.MSG_SIZE - 1]:
+                l.warn("Not a valid command: first byte and last byte mismatching!")
+                continue
 
             if client_addr in self.controllers:
                 if data[0] == self.CMD_KEEP_ALIVE:
                     self.controllers[client_addr].refresh()
-                    print("keep alive")
-                elif data[0] == self.CMD_FIRE:
+                elif data[0] == self.CMD_BUTTONS_CHANGED:
                     self.controllers[client_addr].fire(data[1])
                     self.controllers[client_addr].refresh()
             else:
-                self.controllers[client_addr] = C0ntroller(str(client_addr))
+                self.controllers[client_addr] = C0ntroller(client_addr[0])
 
 def main():
+    global l
+
+    l = logging.getLogger()
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter("%(asctime)s # %(levelname)-8s %(message)s")
+    handler.setFormatter(formatter)
+    l.addHandler(handler)
+
+    l.setLevel(logging.DEBUG)
+
     server = S3rver()
     server.serve()
 
