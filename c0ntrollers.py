@@ -1,10 +1,14 @@
+#!/usr/bin/env python2
 import uinput
 import time
 import select
 import threading
 import socket
 import time
+import subprocess
+import os
 import logging
+import argparse
 
 l = None
 
@@ -95,11 +99,12 @@ class C0ntroller(uinput.Device):
                 else:
                     self.emit(uinput.BTN_3, 0)
 
+            self.syn()
+
         self.prev_event = event
 
 class S3rver(object):
     HOST = "0.0.0.0"
-    PORT = 1337
 
     MSG_SIZE = 6
 
@@ -109,50 +114,74 @@ class S3rver(object):
     CMD_SET_LED_0 = 0x20
     CMD_SET_LED_1 = 0x21
 
-    def __init__(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-        self.server_addr = (self.HOST, self.PORT)
-        self.sock.bind(self.server_addr)
-
+    def __init__(self, port):
+        self.port = port
         self.controllers = {}
 
     def serve(self):
+        l.info("Starting server on port {0}...".format(self.port))
+
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        self.server_addr = (self.HOST, self.port)
+        self.sock.bind(self.server_addr)
+
         while True:
             data, client_addr = self.sock.recvfrom(self.MSG_SIZE)
 
-            l.info("Received data from {0}:".format(client_addr[0]) + str(data)[1:])
+            l.debug("Received data from {0}:".format(client_addr[0]) + str(data)[1:])
 
             if len(data) != self.MSG_SIZE:
-                l.warn("Not a valid command: wrong packet length!")
+                l.warn("{0}: Not a valid command: wrong packet length!".format(client_addr))
                 continue
 
             if data[0] != data[self.MSG_SIZE - 1]:
-                l.warn("Not a valid command: first byte and last byte mismatching!")
+                l.warn("{0}: Not a valid command: first byte and last byte mismatching!".format(client_addr))
                 continue
 
             if client_addr in self.controllers:
-                if data[0] == self.CMD_KEEP_ALIVE:
+                if ord(data[0]) == self.CMD_KEEP_ALIVE:
+                    self.controllers[client_addr].fire(ord(data[1]))
                     self.controllers[client_addr].refresh()
-                elif data[0] == self.CMD_BUTTONS_CHANGED:
-                    self.controllers[client_addr].fire(data[1])
+                elif ord(data[0]) == self.CMD_BUTTONS_CHANGED:
+                    self.controllers[client_addr].fire(ord(data[1]))
                     self.controllers[client_addr].refresh()
             else:
+                log.info("New client {0} connected!".format(client_addr[0]))
                 self.controllers[client_addr] = C0ntroller(client_addr[0])
 
 def main():
     global l
 
-    l = logging.getLogger()
-    handler = logging.StreamHandler()
+    p = argparse.ArgumentParser()
+    p.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
+    p.add_argument("-p", "--port", type=int, default=1337, help="use another port")
+
+    args = p.parse_args()
+
     formatter = logging.Formatter("%(asctime)s # %(levelname)-8s %(message)s")
+
+    handler = logging.StreamHandler()
     handler.setFormatter(formatter)
+
+    l = logging.getLogger()
     l.addHandler(handler)
 
-    l.setLevel(logging.DEBUG)
+    if args.verbose:
+        l.setLevel(logging.DEBUG)
+    else:
+        l.setLevel(logging.INFO)
 
-    server = S3rver()
-    server.serve()
+    l.info("Loading uinput kernel module, if it has not been loaded yet...")
+    dev_null = open(os.devnull, 'w')
+    result = subprocess.call([ "modprobe", "uinput"], stdout=dev_null, stderr=dev_null)
+    dev_null.close()
+
+    if result == 0:
+        server = S3rver(args.port)
+        server.serve()
+    else:
+        l.error("Could not load uinput kernel module! Am I root?")
 
 if __name__ == "__main__":
     main()
