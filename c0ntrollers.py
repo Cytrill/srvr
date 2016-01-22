@@ -122,14 +122,19 @@ class S3rver(object):
         l.info("Starting server on port {0}...".format(self.port))
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, True)
 
         self.server_addr = (self.HOST, self.port)
         self.sock.bind(self.server_addr)
 
+        l.info("Propagating the new game server (me)...")
+        set_host_msg = "\x30\x00\x00\x00\x00\x30"
+        self.sock.sendto(set_host_msg, ("<broadcast>", self.port))
+
         while True:
             data, client_addr = self.sock.recvfrom(self.MSG_SIZE)
 
-            l.debug("Received data from {0}:".format(client_addr[0]) + str(data)[1:])
+            l.debug("Received data from {0}:".format(client_addr[0]) + str([ int(ord(c)) for c in data ]))
 
             if len(data) != self.MSG_SIZE:
                 l.warn("{0}: Not a valid command: wrong packet length!".format(client_addr))
@@ -147,7 +152,7 @@ class S3rver(object):
                     self.controllers[client_addr].fire(ord(data[1]))
                     self.controllers[client_addr].refresh()
             else:
-                log.info("New client {0} connected!".format(client_addr[0]))
+                l.info("New client {0} connected!".format(client_addr[0]))
                 self.controllers[client_addr] = C0ntroller(client_addr[0])
 
 def main():
