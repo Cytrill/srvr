@@ -114,9 +114,17 @@ class S3rver(object):
     CMD_SET_LED_0 = 0x20
     CMD_SET_LED_1 = 0x21
 
+    CMD_SET_HOST = 0x30
+    CMD_ASK_HOST = 0x31
+
     def __init__(self, port):
         self.port = port
         self.controllers = {}
+
+    def propagate_host(self):
+        l.debug("Propagating the new game server (me)...")
+        set_host_msg = "\x30\x00\x00\x00\x00\x30"
+        self.sock.sendto(set_host_msg, ("<broadcast>", self.port))
 
     def serve(self):
         l.info("Starting server on port {0}...".format(self.port))
@@ -127,9 +135,7 @@ class S3rver(object):
         self.server_addr = (self.HOST, self.port)
         self.sock.bind(self.server_addr)
 
-        l.info("Propagating the new game server (me)...")
-        set_host_msg = "\x30\x00\x00\x00\x00\x30"
-        self.sock.sendto(set_host_msg, ("<broadcast>", self.port))
+        self.propagate_host()
 
         while True:
             data, client_addr = self.sock.recvfrom(self.MSG_SIZE)
@@ -144,16 +150,22 @@ class S3rver(object):
                 l.warn("{0}: Not a valid command: first byte and last byte mismatching!".format(client_addr))
                 continue
 
-            if client_addr in self.controllers:
-                if ord(data[0]) == self.CMD_KEEP_ALIVE:
-                    self.controllers[client_addr].fire(ord(data[1]))
-                    self.controllers[client_addr].refresh()
-                elif ord(data[0]) == self.CMD_BUTTONS_CHANGED:
-                    self.controllers[client_addr].fire(ord(data[1]))
-                    self.controllers[client_addr].refresh()
-            else:
-                l.info("New client {0} connected!".format(client_addr[0]))
+            if ord(data[0]) == self.CMD_SET_HOST:
+                continue
+
+            if not client_addr in self.controllers:
                 self.controllers[client_addr] = C0ntroller(client_addr[0])
+                l.info("New client {0} connected!".format(client_addr[0]))
+
+            if ord(data[0]) == self.CMD_KEEP_ALIVE:
+                self.controllers[client_addr].fire(ord(data[1]))
+                self.controllers[client_addr].refresh()
+            elif ord(data[0]) == self.CMD_BUTTONS_CHANGED:
+                self.controllers[client_addr].fire(ord(data[1]))
+                self.controllers[client_addr].refresh()
+            elif ord(data[0]) == self.CMD_ASK_HOST:
+                l.debug("Client asked for a game server.")
+                self.propagate_host()
 
 def main():
     global l
