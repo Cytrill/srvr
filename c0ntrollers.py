@@ -114,7 +114,7 @@ class S3rver(object):
     CMD_SET_LED_0 = 0x20
     CMD_SET_LED_1 = 0x21
 
-    CMD_SET_HOST = 0x30
+    CMD_PROPAGATE_HOST = 0x30
     CMD_ASK_HOST = 0x31
 
     def __init__(self, port):
@@ -123,7 +123,7 @@ class S3rver(object):
 
     def propagate_host(self):
         l.debug("Propagating the new game server (me)...")
-        set_host_msg = "\x30\x00\x00\x00\x00\x30"
+        set_host_msg = "\x30\x00\x00\xFF\x0F\x30"
         self.sock.sendto(set_host_msg, ("<broadcast>", self.port))
 
     def serve(self):
@@ -150,7 +150,7 @@ class S3rver(object):
                 l.warn("{0}: Not a valid command: first byte and last byte mismatching!".format(client_addr))
                 continue
 
-            if ord(data[0]) == self.CMD_SET_HOST:
+            if ord(data[0]) == self.CMD_PROPAGATE_HOST:
                 continue
 
             if not client_addr in self.controllers:
