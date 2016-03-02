@@ -109,8 +109,8 @@ class S3rver(object):
     CMD_KEEP_ALIVE = 0x10
     CMD_BUTTONS_CHANGED = 0x11
 
-    CMD_SET_LED_0 = 0x20
-    CMD_SET_LED_1 = 0x21
+    CMD_SET_LED_LEFT = 0x20
+    CMD_SET_LED_RIGHT = 0x21
 
     CMD_PROPAGATE_HOST = 0x30
     CMD_ASK_HOST = 0x31
@@ -141,7 +141,7 @@ class S3rver(object):
 
     def propagate_host(self):
         l.debug("Propagating the new game server (me)...")
-        set_host_msg = bytes([ 0x30, self.color[0], self.color[1], self.color[2], 0x0F, 0x30 ])
+        set_host_msg = bytes([ 0x30, self.color[0], self.color[1], self.color[2], 0xFF, 0x30 ])
         self.sock.sendto(set_host_msg, ("<broadcast>", self.port))
 
     def serve(self):
