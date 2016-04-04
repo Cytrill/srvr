@@ -18,7 +18,27 @@ def hex_to_rgb(value):
 
     return tuple(int(value[i:i + length // 3], 16) for i in range(0, length, length // 3))
 
-class C0ntroller(uinput.Device):
+class ButtonEvent():
+    UP = "Up"
+    RIGHT = "Right"
+    DOWN = "Down"
+    LEFT = "Left"
+    X = "X"
+    A = "A"
+    B = "B"
+    Y = "Y"
+
+    PRESSED = True
+    RELEASED = False
+
+    def __init__(self, button, state):
+        self.button = button
+        self.state = state
+
+    def __repr__(self):
+        return self.button + ": " + ("pressed" if self.state else "not pressed")
+
+class C0ntroller():
     JOY_UP_MASK = 0x01
     JOY_RIGHT_MASK = 0x02
     JOY_DOWN_MASK = 0x04
@@ -36,16 +56,18 @@ class C0ntroller(uinput.Device):
         uinput.ABS_X + (0, 255, 0, 0),
         uinput.ABS_Y + (0, 255, 0, 0))
 
-    def __init__(self, name):
-        uinput.Device.__init__(self, self.EVENTS, name)
+    def __init__(self, name, callback=None):
+        if callback != None:
+            self.dev = uinput.Device(self.EVENTS, name)
+
+            # sync joystick to center
+            self.dev.emit(uinput.ABS_X, 128, syn=False)
+            self.dev.emit(uinput.ABS_Y, 128)
 
         self.name = name
+        self.callback = callback
         self.refresh_time = time.time()
         self.prev_event = 0x00
-
-        # sync joystick to center
-        self.emit(uinput.ABS_X, 128, syn=False)
-        self.emit(uinput.ABS_Y, 128)
 
     def refresh(self):
         self.refresh_time = time.time()
@@ -57,47 +79,76 @@ class C0ntroller(uinput.Device):
         event_diff = event ^ self.prev_event
 
         if event_diff != 0:
-            if event_diff & (self.JOY_UP_MASK | self.JOY_DOWN_MASK) != 0:
-                if event & self.JOY_UP_MASK != 0 and not event & self.JOY_DOWN_MASK != 0:
-                    self.emit(uinput.ABS_Y, 0)
-                elif event & self.JOY_DOWN_MASK != 0 and not event & self.JOY_UP_MASK != 0:
-                    self.emit(uinput.ABS_Y, 255)
-                else:
-                    self.emit(uinput.ABS_Y, 128)
+            if self.callback != None:
+                event_list = []
 
-            if event_diff & (self.JOY_LEFT_MASK | self.JOY_RIGHT_MASK) != 0:
-                if event & self.JOY_LEFT_MASK != 0 and not event & self.JOY_RIGHT_MASK != 0:
-                    self.emit(uinput.ABS_X, 0)
-                elif event & self.JOY_RIGHT_MASK != 0 and not event & self.JOY_LEFT_MASK != 0:
-                    self.emit(uinput.ABS_X, 255)
-                else:
-                    self.emit(uinput.ABS_X, 128)
+                if event_diff & self.JOY_UP_MASK != 0:
+                    event_list.append(ButtonEvent(ButtonEvent.UP, event & self.JOY_UP_MASK != 0))
 
-            if event_diff & self.BTN_X_MASK != 0:
-                if event & self.BTN_X_MASK != 0:
-                    self.emit(uinput.BTN_0, 1)
-                else:
-                    self.emit(uinput.BTN_0, 0)
+                if event_diff & self.JOY_RIGHT_MASK != 0:
+                    event_list.append(ButtonEvent(ButtonEvent.RIGHT, event & self.JOY_RIGHT_MASK != 0))
 
-            if event_diff & self.BTN_A_MASK != 0:
-                if event & self.BTN_A_MASK != 0:
-                    self.emit(uinput.BTN_1, 1)
-                else:
-                    self.emit(uinput.BTN_1, 0)
+                if event_diff & self.JOY_DOWN_MASK != 0:
+                    event_list.append(ButtonEvent(ButtonEvent.DOWN, event & self.JOY_DOWN_MASK != 0))
 
-            if event_diff & self.BTN_B_MASK != 0:
-                if event & self.BTN_B_MASK != 0:
-                    self.emit(uinput.BTN_2, 1)
-                else:
-                    self.emit(uinput.BTN_2, 0)
+                if event_diff & self.JOY_LEFT_MASK != 0:
+                    event_list.append(ButtonEvent(ButtonEvent.LEFT, event & self.JOY_LEFT_MASK != 0))
 
-            if event_diff & self.BTN_Y_MASK != 0:
-                if event & self.BTN_Y_MASK != 0:
-                    self.emit(uinput.BTN_3, 1)
-                else:
-                    self.emit(uinput.BTN_3, 0)
+                if event_diff & self.BTN_X_MASK != 0:
+                    event_list.append(ButtonEvent(ButtonEvent.X, event & self.BTN_X_MASK != 0))
 
-            self.syn()
+                if event_diff & self.BTN_A_MASK != 0:
+                    event_list.append(ButtonEvent(ButtonEvent.A, event & self.BTN_A_MASK != 0))
+
+                if event_diff & self.BTN_B_MASK != 0:
+                    event_list.append(ButtonEvent(ButtonEvent.B, event & self.BTN_B_MASK != 0))
+
+                if event_diff & self.BTN_Y_MASK != 0:
+                    event_list.append(ButtonEvent(ButtonEvent.Y, event & self.BTN_Y_MASK != 0))
+
+                self.callback(self.name, event_list)
+            else:
+                if event_diff & (self.JOY_UP_MASK | self.JOY_DOWN_MASK) != 0:
+                    if event & self.JOY_UP_MASK != 0 and not event & self.JOY_DOWN_MASK != 0:
+                        self.dev.emit(uinput.ABS_Y, 0)
+                    elif event & self.JOY_DOWN_MASK != 0 and not event & self.JOY_UP_MASK != 0:
+                        self.dev.emit(uinput.ABS_Y, 255)
+                    else:
+                        self.dev.emit(uinput.ABS_Y, 128)
+
+                if event_diff & (self.JOY_LEFT_MASK | self.JOY_RIGHT_MASK) != 0:
+                    if event & self.JOY_LEFT_MASK != 0 and not event & self.JOY_RIGHT_MASK != 0:
+                        self.dev.emit(uinput.ABS_X, 0)
+                    elif event & self.JOY_RIGHT_MASK != 0 and not event & self.JOY_LEFT_MASK != 0:
+                        self.dev.emit(uinput.ABS_X, 255)
+                    else:
+                        self.dev.emit(uinput.ABS_X, 128)
+
+                if event_diff & self.BTN_X_MASK != 0:
+                    if event & self.BTN_X_MASK != 0:
+                        self.dev.emit(uinput.BTN_0, 1)
+                    else:
+                        self.dev.emit(uinput.BTN_0, 0)
+
+                if event_diff & self.BTN_A_MASK != 0:
+                    if event & self.BTN_A_MASK != 0:
+                        self.dev.emit(uinput.BTN_1, 1)
+                    else:
+                        self.dev.emit(uinput.BTN_1, 0)
+
+                if event_diff & self.BTN_B_MASK != 0:
+                    if event & self.BTN_B_MASK != 0:
+                        self.dev.emit(uinput.BTN_2, 1)
+                    else:
+                        self.dev.emit(uinput.BTN_2, 0)
+
+                if event_diff & self.BTN_Y_MASK != 0:
+                    if event & self.BTN_Y_MASK != 0:
+                        self.dev.emit(uinput.BTN_3, 1)
+                    else:
+                        self.dev.emit(uinput.BTN_3, 0)
+
+                self.dev.syn()
 
         self.prev_event = event
 
@@ -115,7 +166,7 @@ class S3rver(object):
     CMD_PROPAGATE_HOST = 0x30
     CMD_ASK_HOST = 0x31
 
-    def __init__(self, port, config=None):
+    def __init__(self, port, config=None, callback=None):
         self.port = port
         self.controllers = {}
 
@@ -138,6 +189,8 @@ class S3rver(object):
         if no_config_present:
             self.color = (0xFF, 0xFF, 0xFF)
             self.timeout = 10
+
+        self.callback = callback
 
     def propagate_host(self):
         l.debug("Propagating the new game server (me)...")
@@ -178,7 +231,7 @@ class S3rver(object):
                         self.controllers[client_addr].refresh()
                     else:
                         l.info("New client {0} connected!".format(client_addr[0]))
-                        self.controllers[client_addr] = C0ntroller(client_addr[0])
+                        self.controllers[client_addr] = C0ntroller(client_addr[0], self.callback)
 
                 if data[0] == self.CMD_KEEP_ALIVE:
                     self.controllers[client_addr].fire(data[1])
@@ -200,15 +253,8 @@ class S3rver(object):
                 l.info("Kicked client {0}! (timeout)".format(client_addr[0]))
                 del self.controllers[client_addr]
 
-def main():
+def start_srvr(verbose=False, port=1337, config="srvr.cnfg", callback=None):
     global l
-
-    p = argparse.ArgumentParser()
-    p.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
-    p.add_argument("-p", "--port", type=int, default=1337, help="use another port")
-    p.add_argument("-c", "--config", type=str, default="srvr.cnfg", help="use another config file")
-
-    args = p.parse_args()
 
     formatter = logging.Formatter("%(asctime)s # %(levelname)-8s %(message)s")
 
@@ -218,7 +264,7 @@ def main():
     l = logging.getLogger()
     l.addHandler(handler)
 
-    if args.verbose:
+    if verbose:
         l.setLevel(logging.DEBUG)
     else:
         l.setLevel(logging.INFO)
@@ -229,10 +275,25 @@ def main():
     dev_null.close()
 
     if result == 0:
-        server = S3rver(args.port, args.config)
-        server.serve()
+        server = S3rver(port, config, callback)
+        thread = threading.Thread(target=server.serve, args=())
+        thread.daemon = True
+        thread.start()
     else:
         l.error("Could not load uinput kernel module! Am I root?")
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
+    p.add_argument("-p", "--port", type=int, default=1337, help="use another port")
+    p.add_argument("-c", "--config", type=str, default="srvr.cnfg", help="use another config file")
+
+    args = p.parse_args()
+
+    start_srvr(args.verbose, args.port, args.config)
+
+    while True:
+        time.sleep(1)
 
 if __name__ == "__main__":
     main()
