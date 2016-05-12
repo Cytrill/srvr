@@ -57,7 +57,7 @@ class C0ntroller():
         uinput.ABS_Y + (0, 255, 0, 0))
 
     def __init__(self, name, callback=None):
-        if callback != None:
+        if callback == None:
             self.dev = uinput.Device(self.EVENTS, name)
 
             # sync joystick to center
