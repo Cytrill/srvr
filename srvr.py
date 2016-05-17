@@ -67,7 +67,7 @@ class C0ntroller():
         self.prev_event = 0x00
 
         if callback == None:
-            self.init_new_device(self.ip)
+            self.init_new_device("{0}:{1}".format(self.ip, self.ip))
 
         self.name_thread = threading.Thread(target=self.listen_for_name, args=())
         self.name_thread.start()
@@ -102,6 +102,7 @@ class C0ntroller():
                     time.sleep(1)
             except:
                 l.error("Lost connection to the nameserver for ip {0}, I will try to reconnect".format(self.ip))
+                time.sleep(5)
 
     def refresh(self):
         self.refresh_time = time.time()
