@@ -56,18 +56,52 @@ class C0ntroller():
         uinput.ABS_X + (0, 255, 0, 0),
         uinput.ABS_Y + (0, 255, 0, 0))
 
-    def __init__(self, name, callback=None):
-        if callback == None:
-            self.dev = uinput.Device(self.EVENTS, name)
-
-            # sync joystick to center
-            self.dev.emit(uinput.ABS_X, 128, syn=False)
-            self.dev.emit(uinput.ABS_Y, 128)
-
-        self.name = name
+    def __init__(self, ip, ns, ns_port, callback=None):
+        self.ip = ip
+        self.ns = ns
+        self.ns_port = ns_port
+        self.name = None
+        self.dev = None
         self.callback = callback
         self.refresh_time = time.time()
         self.prev_event = 0x00
+
+        if callback == None:
+            self.init_new_device(self.ip)
+
+        self.name_thread = threading.Thread(target=self.listen_for_name, args=())
+        self.name_thread.start()
+
+    def init_new_device(self, name):
+        self.dev = None
+        self.dev = uinput.Device(self.EVENTS, name)
+
+        # sync joystick to center
+        self.dev.emit(uinput.ABS_X, 128, syn=False)
+        self.dev.emit(uinput.ABS_Y, 128)
+
+    def listen_for_name(self):
+        while True:
+            try:
+                l.debug("Connecting to nameserver {0} on port {1} for ip {2}".format(self.ns, self.ns_port, self.ip))
+
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.connect((self.ns, self.ns_port))
+
+                sock.send(bytes(self.ip, "utf-8"))
+
+                while True:
+                    self.name = str(sock.recv(1024), "utf-8")
+
+                    # wait for a string
+                    l.debug("The device {0} got a new name: {1}".format(self.ip, self.name))
+
+                    if self.callback == None:
+                        self.init_new_device("{0}:{1}".format(self.name, self.ip))
+
+                    time.sleep(1)
+            except:
+                l.error("Lost connection to the nameserver for ip {0}, I will try to reconnect".format(self.ip))
 
     def refresh(self):
         self.refresh_time = time.time()
@@ -181,14 +215,19 @@ class S3rver(object):
 
                     self.color = hex_to_rgb(config_data["color"])
                     self.timeout = config_data["timeout"]
+                    self.ns = config_data["nameserver"]["host"]
+                    self.ns_port = config_data["nameserver"]["port"]
             except:
                 no_config_present = True
+                l.error("Error loading config file {0}...".format(config))
         else:
             no_config_present = True
 
         if no_config_present:
             self.color = (0xFF, 0xFF, 0xFF)
             self.timeout = 10
+            self.ns = "localhost"
+            self.ns_port = 1338
 
         self.callback = callback
 
@@ -231,7 +270,7 @@ class S3rver(object):
                         self.controllers[client_addr].refresh()
                     else:
                         l.info("New client {0} connected!".format(client_addr[0]))
-                        self.controllers[client_addr] = C0ntroller(client_addr[0], self.callback)
+                        self.controllers[client_addr] = C0ntroller(client_addr[0], self.ns, self.ns_port, self.callback)
 
                 if data[0] == self.CMD_KEEP_ALIVE:
                     self.controllers[client_addr].fire(data[1])

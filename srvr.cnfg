@@ -1,4 +1,8 @@
 {
-    "color": "#FF00FF",
-    "timeout": 10
+    "color": "#00FF00",
+    "timeout": 10,
+    "nameserver": {
+        "host": "localhost",
+        "port": 1338
+    }
 }
