@@ -6,7 +6,7 @@ can be loaded to control the leds on the cytrill game controller.
 
 ## Quickstart Guide:
 
-1. install python-uinput
+1. pip3 install python-uinput
 2. edit srvr.cnfg (change server color and stuff)
 3. sudo ./srvr.py -v
 
