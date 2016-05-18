@@ -36,7 +36,11 @@ class N4meserver(object):
                     l.info("Loaded config file {0}...".format(config))
 
                     self.names_dir = config_data["names_dir"]
+                    self.editor = None
                     self.timeout = config_data["timeout"]
+
+                    if "editor" in config_data:
+                        self.editor = config_data["editor"]
             except:
                 no_config_present = True
                 l.error("Error loading config file {0}...".format(config))
@@ -45,6 +49,7 @@ class N4meserver(object):
 
         if no_config_present:
             self.names_dir = "names"
+            self.editor = None
             self.timeout = 10
 
     def handle_requester(self, client):
@@ -136,7 +141,7 @@ class N4meserver(object):
                     l.warn("{0}: Not a valid command: first byte and last byte mismatching!".format(client_addr))
                     continue
 
-                if data[0] == self.CMD_SET_NAME:
+                if data[0] == self.CMD_SET_NAME and self.editor != None:
                     l.info("New client {0} wants to get a name!".format(client_addr[0]))
 
                     ip = client_addr[0]
@@ -146,7 +151,7 @@ class N4meserver(object):
                         with open(name_file, "w") as f:
                             f.write(ip)
 
-                    subprocess.call([ "gedit", name_file ])
+                    subprocess.call([ self.editor, name_file ])
             except socket.timeout:
                 pass
 

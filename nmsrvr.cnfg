@@ -1,4 +1,5 @@
 {
     "names_dir": "names",
+    "editor": "nvim",
     "timeout": 10
 }
