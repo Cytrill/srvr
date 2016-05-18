@@ -151,7 +151,7 @@ class N4meserver(object):
                         with open(name_file, "w") as f:
                             f.write(ip)
 
-                    subprocess.call([ self.editor, name_file ])
+                    os.system("{0} {1}".format(self.editor, name_file))
             except socket.timeout:
                 pass
 
