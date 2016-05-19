@@ -83,10 +83,10 @@ class C0ntroller():
     def listen_for_name(self):
         while True:
             try:
-                l.debug("Connecting to nameserver {0} on port {1} for ip {2}".format(self.ns, self.ns_port, self.ip))
-
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect((self.ns, self.ns_port))
+
+                l.debug("Connected to nameserver {0} on port {1} for ip {2}".format(self.ns, self.ns_port, self.ip))
 
                 sock.send(bytes(self.ip, "utf-8"))
 
@@ -101,7 +101,6 @@ class C0ntroller():
 
                     time.sleep(1)
             except:
-                l.error("Lost connection to the nameserver for ip {0}, I will try to reconnect".format(self.ip))
                 time.sleep(5)
 
     def refresh(self):
