@@ -49,12 +49,12 @@ class C0ntroller():
     BTN_Y_MASK = 0x80
 
     EVENTS = (
-        uinput.BTN_0,
-        uinput.BTN_1,
-        uinput.BTN_2,
-        uinput.BTN_3,
         uinput.ABS_X + (0, 255, 0, 0),
-        uinput.ABS_Y + (0, 255, 0, 0))
+        uinput.ABS_Y + (0, 255, 0, 0),
+        uinput.BTN_TRIGGER,
+        uinput.BTN_THUMB,
+        uinput.BTN_THUMB2,
+        uinput.BTN_TOP)
 
     def __init__(self, ip, ns, ns_port, callback=None):
         self.ip = ip
@@ -160,27 +160,27 @@ class C0ntroller():
 
                 if event_diff & self.BTN_X_MASK != 0:
                     if event & self.BTN_X_MASK != 0:
-                        self.dev.emit(uinput.BTN_0, 1)
+                        self.dev.emit(uinput.BTN_TRIGGER, 1)
                     else:
-                        self.dev.emit(uinput.BTN_0, 0)
+                        self.dev.emit(uinput.BTN_TRIGGER, 0)
 
                 if event_diff & self.BTN_A_MASK != 0:
                     if event & self.BTN_A_MASK != 0:
-                        self.dev.emit(uinput.BTN_1, 1)
+                        self.dev.emit(uinput.BTN_THUMB, 1)
                     else:
-                        self.dev.emit(uinput.BTN_1, 0)
+                        self.dev.emit(uinput.BTN_THUMB, 0)
 
                 if event_diff & self.BTN_B_MASK != 0:
                     if event & self.BTN_B_MASK != 0:
-                        self.dev.emit(uinput.BTN_2, 1)
+                        self.dev.emit(uinput.BTN_THUMB2, 1)
                     else:
-                        self.dev.emit(uinput.BTN_2, 0)
+                        self.dev.emit(uinput.BTN_THUMB2, 0)
 
                 if event_diff & self.BTN_Y_MASK != 0:
                     if event & self.BTN_Y_MASK != 0:
-                        self.dev.emit(uinput.BTN_3, 1)
+                        self.dev.emit(uinput.BTN_TOP, 1)
                     else:
-                        self.dev.emit(uinput.BTN_3, 0)
+                        self.dev.emit(uinput.BTN_TOP, 0)
 
                 self.dev.syn()
 
